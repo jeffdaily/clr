@@ -28,6 +28,10 @@
 #include <atomic>
 #include <tuple>
 #include <utility>
+#ifdef HELGRIND_SAFE
+#include <condition_variable>
+#include <mutex>
+#endif
 
 namespace amd {
 
@@ -68,6 +72,56 @@ template <class T, class AllocClass = HeapObject> struct SimplyLinkedNode : publ
 };
 
 }  // namespace details
+
+#ifdef HELGRIND_SAFE
+
+class Monitor : public HeapObject {
+ private:
+  //! The Mutex's name
+  char name_[64];
+  const bool recursive_;
+  bool ready;
+  std::mutex mutex_;
+  std::recursive_mutex recursive_mutex_;
+  std::condition_variable cond_;
+  std::condition_variable_any cond_any_;
+ public:
+  explicit Monitor(const char* name = NULL, bool recursive = false);
+  ~Monitor() {}
+
+  //! Try to acquire the lock, return true if successful.
+  bool tryLock();
+
+  //! Acquire the lock or suspend the calling thread.
+  void lock();
+
+  //! Release the lock and wake a single waiting thread if any.
+  void unlock();
+
+  /*! \brief Give up the lock and go to sleep.
+   *
+   *  Calling wait() causes the current thread to go to sleep until
+   *  another thread calls notify()/notifyAll().
+   *
+   *  \note The monitor must be owned before calling wait().
+   */
+  void wait();
+  /*! \brief Wake up a single thread waiting on this monitor.
+   *
+   *  \note The monitor must be owned before calling notify().
+   */
+  void notify();
+  /*! \brief Wake up all threads that are waiting on this monitor.
+   *
+   *  \note The monitor must be owned before calling notifyAll().
+   */
+  void notifyAll();
+
+  //! Return this lock's name.
+  const char* name() const { return name_; }
+};
+
+#else
 
 class Monitor : public HeapObject {
   typedef details::SimplyLinkedNode<Semaphore*, StackObject> LinkedNode;
@@ -155,6 +209,8 @@ class Monitor : public HeapObject {
   const char* name() const { return name_; }
 };
 
+#endif // HELGRIND_SAFE
+
 class ScopedLock : StackObject {
  private:
   Monitor* lock_;
@@ -174,6 +230,8 @@ class ScopedLock : StackObject {
 /*! @}
  *  @}
  */
+
+#ifndef HELGRIND_SAFE
 
 inline bool Monitor::tryLock() {
   Thread* thread = Thread::current();
@@ -259,6 +317,8 @@ inline void Monitor::unlock() {
   // Finish the unlock operation: find a thread to wake up.
   finishUnlock();
 }
+
+#endif // HELGRIND_SAFE
 
 }  // namespace amd
 

@@ -30,6 +30,94 @@
 
 namespace amd {
 
+#ifdef HELGRIND_SAFE
+
+Monitor::Monitor(const char* name, bool recursive)
+    : recursive_(recursive),
+      ready(true)
+{
+  if (name == NULL) {
+    const char* unknownName = "@unknown@";
+    assert(sizeof(unknownName) < sizeof(name_) && "just checking");
+    ::strncpy(name_, unknownName, sizeof(name_) - 1);
+  } else {
+    ::strncpy(name_, name, sizeof(name_) - 1);
+  }
+  name_[sizeof(name_) - 1] = '\0';
+}
+
+bool Monitor::tryLock()
+{
+    bool retval;
+    if (recursive_) {
+        retval = recursive_mutex_.try_lock();
+    }
+    else {
+        retval = mutex_.try_lock();
+    }
+    if (retval) {
+        ready = false;
+    }
+    return retval;
+}
+
+void Monitor::lock()
+{
+    if (recursive_) {
+        recursive_mutex_.lock();
+    }
+    else {
+        mutex_.lock();
+    }
+    ready = false;
+}
+
+void Monitor::unlock()
+{
+    ready = true;
+    if (recursive_) {
+        recursive_mutex_.unlock();
+    }
+    else {
+        mutex_.unlock();
+    }
+}
+
+void Monitor::wait()
+{
+    if (recursive_) {
+        std::unique_lock<std::recursive_mutex> lk(recursive_mutex_, std::adopt_lock);
+        cond_any_.wait(lk, [this]{ return ready == true; });
+    }
+    else {
+        std::unique_lock<std::mutex> lk(mutex_, std::adopt_lock);
+        cond_.wait(lk, [this]{ return ready == true; });
+    }
+    ready = false;
+}
+
+void Monitor::notify()
+{
+    if (recursive_) {
+        cond_any_.notify_one();
+    }
+    else {
+        cond_.notify_one();
+    }
+}
+
+void Monitor::notifyAll()
+{
+    if (recursive_) {
+        cond_any_.notify_all();
+    }
+    else {
+        cond_.notify_all();
+    }
+}
+
+#else
+
 Monitor::Monitor(const char* name, bool recursive)
     : contendersList_(0), onDeck_(0), waitersList_(NULL), owner_(NULL), recursive_(recursive) {
   if (name == NULL) {
@@ -315,5 +403,7 @@ void Monitor::notifyAll() {
     notify();
   }
 }
+
+#endif // HELGRIND_SAFE
 
 }  // namespace amd

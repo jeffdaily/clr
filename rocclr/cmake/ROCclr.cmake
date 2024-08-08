@@ -26,10 +26,11 @@ endif()
 
 # ROCclr abstracts the usage of multiple AMD compilers and runtimes.
 # It is possible to support multiple backends concurrently in the same binary.
-option(ROCCLR_ENABLE_HSAIL "Enable support for HSAIL compiler" OFF)
-option(ROCCLR_ENABLE_LC    "Enable support for LC compiler"    ON)
-option(ROCCLR_ENABLE_HSA   "Enable support for HSA runtime"    ON)
-option(ROCCLR_ENABLE_PAL   "Enable support for PAL runtime"    OFF)
+option(ROCCLR_ENABLE_HSAIL  "Enable support for HSAIL compiler" OFF)
+option(ROCCLR_ENABLE_LC     "Enable support for LC compiler"    ON)
+option(ROCCLR_ENABLE_HSA    "Enable support for HSA runtime"    ON)
+option(ROCCLR_ENABLE_PAL    "Enable support for PAL runtime"    OFF)
+option(ROCCLR_HELGRIND_SAFE "Enable helgrind-safe classes"      OFF)
 
 if((NOT ROCCLR_ENABLE_HSAIL) AND (NOT ROCCLR_ENABLE_LC))
   message(FATAL "Support for at least one compiler needs to be enabled!")
@@ -145,4 +146,8 @@ endif()
 
 if(ROCCLR_ENABLE_PAL)
   include(ROCclrPAL)
+endif()
+
+if(ROCCLR_HELGRIND_SAFE)
+  target_compile_definitions(rocclr PUBLIC HELGRIND_SAFE=1)
 endif()
