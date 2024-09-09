@@ -262,7 +262,7 @@ class Command : public Event {
   std::vector<void*> data_;
   const Event* waitingEvent_;  //!< Waiting event associated with the marker
 
-  bool capturing_ = false;           //!< Flag to enable/disable graph gpu packet capture
+  bool packetCapturing_ = false;           //!< Flag to enable/disable graph gpu packet capture
   uint8_t* gpuPacket_ = nullptr;     //!< GPU packet to capture, when graph capturing is enabled
   address kernArgOffset_ = nullptr;  //!< KernelArg buffer to used when graph capturing is enabled
   std::string* capturedKernelName_ = nullptr;  //!< Kenrnel under capture
@@ -303,12 +303,12 @@ class Command : public Event {
 
  public:
   //! Returns AQL buffer state
-  bool getCapturingState() const { return capturing_; }
+  bool getPktCapturingState() const { return packetCapturing_; }
 
   //! Sets AQL capture state, aql packet to capture and where to copy kernArgs
-  void setCapturingState(bool state, uint8_t* packet, address kernArgOffset,
-                         std::string* capturedKernelName) {
-    capturing_ = state;
+  void setPktCapturingState(bool state, uint8_t* packet, address kernArgOffset,
+                            std::string* capturedKernelName) {
+    packetCapturing_ = state;
     gpuPacket_ = packet;
     kernArgOffset_ = kernArgOffset;
     capturedKernelName_ = capturedKernelName;

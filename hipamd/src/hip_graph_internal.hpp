@@ -235,7 +235,7 @@ struct GraphNode : public hipGraphNodeDOTAttribute {
   void CaptureAndFormPacket(hip::Stream* capture_stream, address kernArgOffset) {
     hipError_t status = CreateCommand(capture_stream);
     for (auto& command : commands_) {
-      command->setCapturingState(true, GetAqlPacket(), kernArgOffset, &capturedKernelName_);
+      command->setPktCapturingState(true, GetAqlPacket(), kernArgOffset, &capturedKernelName_);
       // Enqueue command to capture GPU Packet. The packet is not submitted to the device.
       // The packet is stored in gpuPacket_ and submitted during graph launch.
       command->submit(*(command->queue())->vdev());
