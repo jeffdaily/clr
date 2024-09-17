@@ -30,21 +30,21 @@ namespace hip {
 static amd::Monitor eventSetLock{"Guards global event set"};
 static std::unordered_set<hipEvent_t> eventSet;
 
-bool Event::ready(eventType type) {
+bool Event::ready() {
   if (event_->status() != CL_COMPLETE) {
     event_->notifyCmdQueue();
   }
   // Check HW status of the ROCcrl event. Note: not all ROCclr modes support HW status
-  bool ready = CheckHwEvent(type);
+  bool ready = CheckHwEvent();
   if (!ready) {
     ready = (event_->status() == CL_COMPLETE);
   }
   return ready;
 }
 
-bool EventDD::ready(eventType type) {
+bool EventDD::ready() {
   // Check HW status of the ROCcrl event. Note: not all ROCclr modes support HW status
-  bool ready = CheckHwEvent(type);
+  bool ready = CheckHwEvent();
   // FIXME: Remove status check entirely
   if (!ready) {
     ready = (event_->status() == CL_COMPLETE);
@@ -60,7 +60,7 @@ hipError_t Event::query() {
     return hipSuccess;
   }
 
-  return ready(Query) ? hipSuccess : hipErrorNotReady;
+  return ready() ? hipSuccess : hipErrorNotReady;
 }
 
 hipError_t Event::synchronize() {
@@ -108,7 +108,7 @@ hipError_t Event::elapsedTime(Event& eStop, float& ms) {
       return hipErrorInvalidHandle;
     }
 
-    if (!ready(ElapsedTime)) {
+    if (!ready()) {
       return hipErrorNotReady;
     }
 
@@ -124,7 +124,7 @@ hipError_t Event::elapsedTime(Event& eStop, float& ms) {
     return hipErrorInvalidHandle;
   }
 
-  if (!ready(ElapsedTime) || !eStop.ready(ElapsedTime)) {
+  if (!ready() || !eStop.ready()) {
     return hipErrorNotReady;
   }
 
@@ -202,7 +202,7 @@ hipError_t Event::streamWait(hipStream_t stream, uint flags) {
   hip::Stream* hip_stream = hip::getStream(stream);
   // Access to event_ object must be lock protected
   amd::ScopedLock lock(lock_);
-  if ((event_ == nullptr) || (event_->command().queue() == hip_stream) || ready(StreamWait)) {
+  if ((event_ == nullptr) || (event_->command().queue() == hip_stream) || ready()) {
     return hipSuccess;
   }
   if (!event_->notifyCmdQueue()) {
