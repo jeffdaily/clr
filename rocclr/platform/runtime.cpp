@@ -117,6 +117,7 @@ RuntimeTearDown::~RuntimeTearDown() {
       it->release();
     }
     Runtime::tearDown();
+    delete Thread::current();
   }
 #endif
 }
