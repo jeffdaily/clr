@@ -61,7 +61,7 @@
 // - Reset any of the *_STEP_VERSION defines to zero if the corresponding *_MAJOR_VERSION increases
 #define HIP_API_TABLE_STEP_VERSION 0
 #define HIP_COMPILER_API_TABLE_STEP_VERSION 0
-#define HIP_RUNTIME_API_TABLE_STEP_VERSION 5
+#define HIP_RUNTIME_API_TABLE_STEP_VERSION 4
 
 // HIP API interface
 typedef hipError_t (*t___hipPopCallConfiguration)(dim3* gridDim, dim3* blockDim, size_t* sharedMem,
@@ -998,9 +998,6 @@ typedef hipError_t (*t_hipDrvGraphMemcpyNodeGetParams)(hipGraphNode_t hNode,
 typedef hipError_t (*t_hipDrvGraphMemcpyNodeSetParams)(hipGraphNode_t hNode,
                                        const HIP_MEMCPY3D* nodeParams);
 
-typedef hipError_t (*t_hipExtHostAlloc)(void **ptr, size_t size,
-                                         unsigned int flags);
-
 // HIP Compiler dispatch table
 struct HipCompilerDispatchTable {
   // HIP_COMPILER_API_TABLE_STEP_VERSION == 0
@@ -1510,11 +1507,8 @@ struct HipDispatchTable {
   t_hipDrvGraphMemcpyNodeGetParams hipDrvGraphMemcpyNodeGetParams_fn;
   t_hipDrvGraphMemcpyNodeSetParams hipDrvGraphMemcpyNodeSetParams_fn;
 
-  // HIP_RUNTIME_API_TABLE_STEP_VERSION == 5
-  t_hipExtHostAlloc hipExtHostAlloc_fn;
-
   // DO NOT EDIT ABOVE!
-  // HIP_RUNTIME_API_TABLE_STEP_VERSION == 6
+  // HIP_RUNTIME_API_TABLE_STEP_VERSION == 5
 
   // ******************************************************************************************* //
   //
