@@ -1151,6 +1151,7 @@ FatBinaryInfo** StatCO::addFatBinary(const void* data, bool initialized) {
     hipError_t err = digestFatBinary(data, modules_[data]);
     assert(err == hipSuccess);
   }
+  modules_reverse_[&modules_[data]] = data;
   return &modules_[data];
 }
 
@@ -1241,6 +1242,13 @@ hipError_t StatCO::getStatFunc(hipFunction_t* hfunc, const void* hostFunction, i
     return hipErrorInvalidSymbol;
   }
 
+  // lazy load
+  FatBinaryInfo **module = it->second->moduleInfo();
+  if (*(module) == nullptr) {
+    hipError_t err = digestFatBinary(modules_reverse_[module], *module);
+    assert(err == hipSuccess);
+  }
+
   return it->second->getStatFunc(hfunc, deviceId);
 }
 
@@ -1251,6 +1259,13 @@ hipError_t StatCO::getStatFuncAttr(hipFuncAttributes* func_attr, const void* hos
   const auto it = functions_.find(hostFunction);
   if (it == functions_.end()) {
     return hipErrorInvalidSymbol;
+  }
+
+  // lazy load
+  FatBinaryInfo **module = it->second->moduleInfo();
+  if (*(module) == nullptr) {
+    hipError_t err = digestFatBinary(modules_reverse_[module], *module);
+    assert(err == hipSuccess);
   }
 
   return it->second->getStatFuncAttr(func_attr, deviceId);
@@ -1277,6 +1292,13 @@ hipError_t StatCO::getStatGlobalVar(const void* hostVar, int deviceId, hipDevice
     return hipErrorInvalidSymbol;
   }
 
+  // lazy load
+  FatBinaryInfo **module = it->second->moduleInfo();
+  if (*(module) == nullptr) {
+    hipError_t err = digestFatBinary(modules_reverse_[module], *module);
+    assert(err == hipSuccess);
+  }
+
   DeviceVar* dvar = nullptr;
   IHIP_RETURN_ONFAIL(it->second->getStatDeviceVar(&dvar, deviceId));
 
@@ -1296,6 +1318,13 @@ hipError_t StatCO::initStatManagedVarDevicePtr(int deviceId) {
   if (managedVarsDevicePtrInitalized_.find(deviceId) == managedVarsDevicePtrInitalized_.end() ||
       !managedVarsDevicePtrInitalized_[deviceId]) {
     for (auto var : managedVars_) {
+      // lazy load
+      FatBinaryInfo **module = var->moduleInfo();
+      if (*(module) == nullptr) {
+        hipError_t err = digestFatBinary(modules_reverse_[module], *module);
+        assert(err == hipSuccess);
+      }
+
       DeviceVar* dvar = nullptr;
       IHIP_RETURN_ONFAIL(var->getStatDeviceVar(&dvar, deviceId));
 

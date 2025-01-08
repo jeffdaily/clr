@@ -180,6 +180,7 @@ private:
   friend class hip::PlatformState;
   //Populated during __hipRegisterFatBinary
   std::unordered_map<const void*, FatBinaryInfo*> modules_;
+  std::unordered_map<FatBinaryInfo**, const void*> modules_reverse_;
   //Populated during __hipRegisterFuncs
   std::unordered_map<const void*, Function*> functions_;
   //Populated during __hipRegisterVars
