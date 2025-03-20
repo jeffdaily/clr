@@ -155,21 +155,24 @@ bool Function::isValidDynFunc(const void* hfunc) {
 }
 
 hipError_t Function::getStatFunc(hipFunction_t* hfunc, int deviceId) {
-  guarantee(modules_ != nullptr, "Module not initialized");
-
-  if (dFunc_.size() != g_devices.size()) {
+  if (deviceId >= dFunc_.size()) {
     return hipErrorNoBinaryForGpu;
   }
-
+  if (dFunc_[deviceId] != nullptr) {
+    *hfunc = dFunc_[deviceId]->asHipFunction();
+    return hipSuccess;
+  }
+  amd::ScopedLock lock((*modules_)->FatBinaryLock());
+  // Check for the compiled kernel again, to make sure only one thread does compilation
+  if (dFunc_[deviceId] != nullptr) {
+    *hfunc = dFunc_[deviceId]->asHipFunction();
+    return hipSuccess;
+  }
   hipModule_t hmod = nullptr;
   IHIP_RETURN_ONFAIL((*modules_)->BuildProgram(deviceId));
   IHIP_RETURN_ONFAIL((*modules_)->GetModule(deviceId, &hmod));
-
-  if (dFunc_[deviceId] == nullptr) {
-    dFunc_[deviceId] = new DeviceFunc(name_, hmod);
-  }
+  dFunc_[deviceId] = new DeviceFunc(name_, hmod);
   *hfunc = dFunc_[deviceId]->asHipFunction();
-
   return hipSuccess;
 }
 
