@@ -85,7 +85,10 @@ hipError_t ihipGraphAddKernelNode(hip::GraphNode** pGraphNode, hip::Graph* graph
                                   hip::GraphNode* const* pDependencies, size_t numDependencies,
                                   const hipKernelNodeParams* pNodeParams,
                                   const ihipExtKernelEvents* pNodeEvents = nullptr,
-                                  bool capture = true, int coopKernel = 0) {
+                                  bool capture = true, int coopKernel = 0,
+                                  int globalWorkSizeX_remainder = 0,
+                                  int globalWorkSizeY_remainder = 0,
+                                  int globalWorkSizeZ_remainder = 0) {
   if (pGraphNode == nullptr || graph == nullptr ||
       (numDependencies > 0 && pDependencies == nullptr) || pNodeParams == nullptr ||
       pNodeParams->func == nullptr) {
@@ -105,16 +108,17 @@ hipError_t ihipGraphAddKernelNode(hip::GraphNode** pGraphNode, hip::Graph* graph
     return status;
   }
 
-  size_t globalWorkSizeX = static_cast<size_t>(pNodeParams->gridDim.x) * pNodeParams->blockDim.x;
-  size_t globalWorkSizeY = static_cast<size_t>(pNodeParams->gridDim.y) * pNodeParams->blockDim.y;
-  size_t globalWorkSizeZ = static_cast<size_t>(pNodeParams->gridDim.z) * pNodeParams->blockDim.z;
+  size_t globalWorkSizeX = static_cast<size_t>(pNodeParams->gridDim.x) * pNodeParams->blockDim.x + globalWorkSizeX_remainder;
+  size_t globalWorkSizeY = static_cast<size_t>(pNodeParams->gridDim.y) * pNodeParams->blockDim.y + globalWorkSizeY_remainder;
+  size_t globalWorkSizeZ = static_cast<size_t>(pNodeParams->gridDim.z) * pNodeParams->blockDim.z + globalWorkSizeZ_remainder;
   if (globalWorkSizeX > std::numeric_limits<uint32_t>::max() ||
       globalWorkSizeY > std::numeric_limits<uint32_t>::max() ||
       globalWorkSizeZ > std::numeric_limits<uint32_t>::max()) {
     return hipErrorInvalidConfiguration;
   }
 
-  *pGraphNode = new hip::GraphKernelNode(pNodeParams, pNodeEvents, coopKernel);
+  *pGraphNode = new hip::GraphKernelNode(pNodeParams, pNodeEvents, coopKernel,
+          globalWorkSizeX_remainder, globalWorkSizeY_remainder, globalWorkSizeZ_remainder);
   status = ihipGraphAddNode(*pGraphNode, graph, pDependencies, numDependencies, capture);
   return status;
 }
@@ -241,10 +245,11 @@ hipError_t capturehipLaunchKernel(hipStream_t& stream, const void*& hostFunction
   return hipSuccess;
 }
 
-hipError_t ihipExtLaunchKernel(hipStream_t stream, hipFunction_t f, uint32_t globalWorkSizeX,
-                               uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
-                               uint32_t localWorkSizeX, uint32_t localWorkSizeY,
-                               uint32_t localWorkSizeZ, size_t sharedMemBytes, void** kernelParams,
+hipError_t ihipExtLaunchKernel(hipStream_t stream, hipFunction_t f,
+                               uint32_t globalWorkSizeX, uint32_t globalWorkSizeY, uint32_t globalWorkSizeZ,
+                               uint32_t globalWorkSizeX_remainder, uint32_t globalWorkSizeY_remainder, uint32_t globalWorkSizeZ_remainder,
+                               uint32_t localWorkSizeX, uint32_t localWorkSizeY, uint32_t localWorkSizeZ,
+                               size_t sharedMemBytes, void** kernelParams,
                                void** extra, hipEvent_t startEvent, hipEvent_t stopEvent,
                                uint32_t flags, bool capture = true) {
   if (!hip::isValid(stream)) {
@@ -282,7 +287,9 @@ hipError_t ihipExtLaunchKernel(hipStream_t stream, hipFunction_t f, uint32_t glo
 
   status =
       ihipGraphAddKernelNode(&pGraphNode, s->GetCaptureGraph(), s->GetLastCapturedNodes().data(),
-                             s->GetLastCapturedNodes().size(), &nodeParams, &nodeEvents);
+                             s->GetLastCapturedNodes().size(), &nodeParams, &nodeEvents,
+                             true, 0,
+                             globalWorkSizeX_remainder, globalWorkSizeY_remainder, globalWorkSizeZ_remainder);
 
   if (status != hipSuccess) {
     return status;
@@ -301,8 +308,13 @@ hipError_t capturehipExtModuleLaunchKernel(hipStream_t& stream, hipFunction_t& f
                                            hipEvent_t& stopEvent, uint32_t& flags) {
   ClPrint(amd::LOG_INFO, amd::LOG_API,
           "[hipGraph] Current capture node ExtModuleLaunchKernel on stream : %p", stream);
-  return ihipExtLaunchKernel(stream, f, globalWorkSizeX / localWorkSizeX,
-                             globalWorkSizeY / localWorkSizeY, globalWorkSizeZ / localWorkSizeZ,
+  return ihipExtLaunchKernel(stream, f,
+                             globalWorkSizeX / localWorkSizeX,
+                             globalWorkSizeY / localWorkSizeY,
+                             globalWorkSizeZ / localWorkSizeZ,
+                             globalWorkSizeX % localWorkSizeX,
+                             globalWorkSizeY % localWorkSizeY,
+                             globalWorkSizeZ % localWorkSizeZ,
                              localWorkSizeX, localWorkSizeY, localWorkSizeZ, sharedMemBytes,
                              kernelParams, extra, startEvent, stopEvent, flags);
 }
@@ -314,8 +326,10 @@ hipError_t capturehipExtLaunchKernel(hipStream_t& stream, const void*& hostFunct
           "[hipGraph] Current capture node ExtLaunchKernel on stream : %p", stream);
   return ihipExtLaunchKernel(
       stream, reinterpret_cast<hipFunction_t>(const_cast<void*>(hostFunction)),
-      gridDim.x, gridDim.y, gridDim.z, blockDim.x,
-      blockDim.y, blockDim.z, sharedMemBytes, args, nullptr, startEvent, stopEvent, flags);
+      gridDim.x, gridDim.y, gridDim.z,
+      0, 0, 0,
+      blockDim.x, blockDim.y, blockDim.z,
+      sharedMemBytes, args, nullptr, startEvent, stopEvent, flags);
 }
 
 hipError_t capturehipModuleLaunchKernel(hipStream_t& stream, hipFunction_t& f, uint32_t& gridDimX,
