@@ -972,6 +972,9 @@ class GraphKernelNode : public GraphNode {
   ihipExtKernelEvents kernelEvents_;   //!< Events for Ext launch kernel
   bool hasHiddenHeap_;                 //!< Kernel has hidden heap(device side allocation)
   int coopKernel_;                     //!< Launch cooperative kernel
+  int globalWorkSizeX_remainder_;
+  int globalWorkSizeY_remainder_;
+  int globalWorkSizeZ_remainder_;
 
  public:
   bool HasHiddenHeap() const { return hasHiddenHeap_; }
@@ -1165,7 +1168,10 @@ class GraphKernelNode : public GraphNode {
   }
 
   GraphKernelNode(const hipKernelNodeParams* pNodeParams, const ihipExtKernelEvents* pEvents,
-                  int coopKernel = 0)
+                  int coopKernel = 0,
+                  int globalWorkSizeX_remainder = 0,
+                  int globalWorkSizeY_remainder = 0,
+                  int globalWorkSizeZ_remainder = 0)
       : GraphNode(hipGraphNodeTypeKernel, "bold", "octagon", "KERNEL") {
     kernelParams_ = *pNodeParams;
     kernelEvents_ = { 0 };
@@ -1179,6 +1185,9 @@ class GraphKernelNode : public GraphNode {
     kernelAttrInUse_ = 0;
     hasHiddenHeap_ = false;
     coopKernel_ = coopKernel;
+    globalWorkSizeX_remainder_ = globalWorkSizeX_remainder;
+    globalWorkSizeY_remainder_ = globalWorkSizeY_remainder;
+    globalWorkSizeZ_remainder_ = globalWorkSizeZ_remainder;
   }
 
   ~GraphKernelNode() { freeParams(); }
@@ -1209,6 +1218,9 @@ class GraphKernelNode : public GraphNode {
     kernelParams_ = rhs.kernelParams_;
     kernelEvents_ = rhs.kernelEvents_;
     coopKernel_ = rhs.coopKernel_;
+    globalWorkSizeX_remainder_ = rhs.globalWorkSizeX_remainder_;
+    globalWorkSizeY_remainder_ = rhs.globalWorkSizeY_remainder_;
+    globalWorkSizeZ_remainder_ = rhs.globalWorkSizeZ_remainder_;
     hipError_t status = copyParams(&rhs.kernelParams_);
     if (status != hipSuccess) {
       ClPrint(amd::LOG_ERROR, amd::LOG_CODE, "[hipGraph] Failed to allocate memory to copy params");
@@ -1256,10 +1268,12 @@ class GraphKernelNode : public GraphNode {
       }
     }
     status = ihipLaunchKernelCommand(
-        command, func, kernelParams_.gridDim.x * kernelParams_.blockDim.x,
-        kernelParams_.gridDim.y * kernelParams_.blockDim.y,
-        kernelParams_.gridDim.z * kernelParams_.blockDim.z, kernelParams_.blockDim.x,
-        kernelParams_.blockDim.y, kernelParams_.blockDim.z, kernelParams_.sharedMemBytes, stream,
+        command, func,
+        kernelParams_.gridDim.x * kernelParams_.blockDim.x + globalWorkSizeX_remainder_,
+        kernelParams_.gridDim.y * kernelParams_.blockDim.y + globalWorkSizeY_remainder_,
+        kernelParams_.gridDim.z * kernelParams_.blockDim.z + globalWorkSizeZ_remainder_,
+        kernelParams_.blockDim.x, kernelParams_.blockDim.y, kernelParams_.blockDim.z,
+        kernelParams_.sharedMemBytes, stream,
         kernelParams_.kernelParams, kernelParams_.extra, kernelEvents_.startEvent_,
         kernelEvents_.stopEvent_, flags, coopKernel_, 0, 0, 0, 0, 0);
     if (signal_is_required_) {
